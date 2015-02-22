@@ -1,0 +1,123 @@
+---
+title: "Machine Learning Project"
+author: "Kevin"
+date: "February 21, 2015"
+output: html_document
+---
+
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+# Data 
+The training data for this project are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+# What you should submit
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+
+# Reproducibility 
+Due to security concerns with the exchange of R code, your code will not be run during the evaluation by your classmates. Please be sure that if they download the repo, they will be able to view the compiled HTML version of your analysis. 
+
+
+### Libraries used
+```{r}
+library(caret)
+library(corrplot)
+library(randomForest)
+library(kernlab)
+library(knitr)
+```
+```{r setoptions, echo = FALSE}
+opts_chunk$set(cache = FALSE)
+```
+
+
+### Data load
+```{r, eval = FALSE}
+# Download file
+if (!file.exists("data")) {dir.create("data")}
+fileUrl1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+destfile1 <- "./data/pml-training.csv"
+fileUrl2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+destfile2 <- "./data/pml-testing.csv"
+download.file(fileUrl1, destfile = destfile1)
+download.file(fileUrl2, destfile = destfile2)
+dateDownloaded <- date()
+
+# Read training csv 
+trainingData <- read.csv("./data/pml-training.csv", na.strings= c("NA",""," "))
+
+# Clean data
+trainingDataNAs <- apply(trainingData, 2, function(x) {sum(is.na(x))})
+trainingDataClean <- trainingData[,which(trainingDataNAs == 0)]
+trainingDataClean <- trainingDataClean[8:length(trainingDataClean)]
+```
+
+
+### Creating a model
+The test data set was split up into training and validation sets in a 70:30 ratio in order to train the model and then test it against data it was not yet fitted to.
+
+```{r}
+fromTrain <- createDataPartition(y = trainingDataClean$classe, p = 0.7, list = FALSE)
+training <- trainingDataClean[fromTrain, ]
+validation <- trainingDataClean[-fromTrain, ]
+```
+
+
+The random forest model was chosen to predict the classification for its methods towards balancing error in population of unbalanced data sets. A correllation plot was produced in evalute the relationships between variables, where darker blue and red colours imply a higher positive and negative relationships between pairs of variables.
+
+```{r}
+corrMatrix <- cor(training[, -length(training)])
+corrplot(correlMatrix, order = "FPC", method = "circle", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
+```
+
+Unusually high correlated predictors did not appear, thus implying most variables could be used in the final mode. Using all other variables as predictors, the final model was fit with the outcome set to training.
+
+```{r}
+# Fit final model
+finMod <- randomForest(classe ~ ., data = training)
+finMod
+```
+
+A lower error rate (0.59%) was estimated by the model, which is an exceptable level.
+
+### Validation
+The final model was run against the remmaining third of the original test set. The results were placed in a confusion matrix against actual classifications to further determine accuracy of the model.
+
+```{r}
+valMod <- predict(finMod, validation)
+confusionMatrix(crossval$classe, valMod)
+```
+
+This model returned 0.996 accuracy, which is good.
+
+### Test
+The test dataset was then loaded and processed using the the ETL as the training set. 
+
+```{r}
+# Process test set
+testData <- read.csv("./data/pml-testing.csv", na.strings= c("NA",""," "))
+testDataNAs <- apply(testData, 2, function(x) {sum(is.na(x))})
+testDataClean <- testData[,which(testDataNAs == 0)]
+testDataClean <- testDataClean[8:length(testDataClean)]
+```
+
+The finished model predict the classifications of the 20 results of the test data.
+```{r}
+testMod <- predict(finMod, testDataClean)
+testMod
+```
+
+### Conclusion
+After loading each of the letters into the assignment as single text files, each one was returned as correct.
